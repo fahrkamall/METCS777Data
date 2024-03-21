@@ -1,51 +1,42 @@
-# METCS777Data
-Instructions For Running AWS and Microsoft Code
-# Databricks notebook source
+# Basic ETL Process with AWS S3 and Microsoft Azure
 
-# Loading AWS credentials from a CSV file stored in Databricks FileStore
-aws_keys_df = spark.read.format('csv')\
-    .option('header', 'true')\
-    .option('inferschema', 'true')\
-    .load('/FileStore/rootkey.csv')
+## Prerequisites
+Before running the code, ensure you have access to the following:
+- A Databricks account with the ability to create and run notebooks.
+- AWS S3 Bucket with your dataset stored in CSV format.
+- Microsoft Azure Storage account with your dataset stored in CSV format.
 
-# Displaying the column names of the DataFrame
-aws_keys_df.columns
+## Setting Up the Environment
+1. **Databricks Workspace**: Log in to your Databricks workspace.
+2. **Create a New Notebook**: Import the Python scripts into new notebooks in your Databricks workspace.
 
-# Extracting AWS Access Key and Secret Key from the DataFrame
-ACCESS_KEY = aws_keys_df.select('Access key ID').take(1)[0]['Access key ID']
-SECRET_KEY = aws_keys_df.select('Secret access key').take(1)[0]['Secret access key']
+## Running the Code
 
-# Importing the urllib library to encode the SECRET_KEY
-import urllib
-ENCODED_SECRET_KEY = urllib.parse.quote(string=SECRET_KEY, safe="")
+### AWS S3
+1. **AWS Credentials**: Ensure your AWS credentials (Access Key ID and Secret Access Key) are stored in a CSV file in the Databricks FileStore.
+2. **Open the AWS S3 Notebook**: In your Databricks workspace, open the notebook created for the AWS S3 Python script.
+3. **Run All Cells**: Execute all cells in the notebook. The code will:
+   - Mount the AWS S3 bucket to Databricks FS.
+   - Perform basic data transformations.
+   - Save the transformed data back to S3 in Parquet format.
+4. **Verify the Output**: Check the mounted S3 bucket path to ensure the `New_circuits` Parquet file has been created.
 
-# Setting up AWS S3 bucket details and mount name for Databricks
-AWS_S3_BUCKET = 'databricks-5'
-MOUNT_NAME = '/mnt/mount_s4'
-SOURCE_URL = "s3a://%s:%s@%s" % (ACCESS_KEY, ENCODED_SECRET_KEY, AWS_S3_BUCKET)
+### Microsoft Azure
+1. **Azure Blob Storage Configuration**: Make sure the Azure Storage account key is correctly configured in the script.
+2. **Open the Microsoft Azure Notebook**: In your Databricks workspace, open the notebook created for the Microsoft Azure Python script.
+3. **Run All Cells**: Execute all cells in the notebook. The code will:
+   - Access the Azure Blob Storage.
+   - Perform similar data transformations.
+   - Save the transformed data to a new location in Azure Blob Storage in Parquet format.
+4. **Verify the Output**: Check the new Blob Storage location to ensure the Parquet file has been created.
 
-# Mounting the AWS S3 bucket to Databricks filesystem
-dbutils.fs.mount(SOURCE_URL, MOUNT_NAME)
+## Understanding the Code
+- The code performs basic ETL tasks: extracting data from CSV files stored in cloud storage, transforming the data (e.g., renaming columns), and loading the transformed data into a new location in Parquet format.
+- Both scripts utilize Databricks' Spark DataFrame API for data manipulation.
 
-# Listing files in the mounted directory
-# MAGIC %fs ls '/mnt/mount_s4'
+## Troubleshooting
+- **Authentication Issues**: Ensure your cloud storage credentials are correct and have the necessary permissions.
+- **File Not Found**: Verify the paths to your datasets in both AWS S3 and Azure Blob Storage are correct.
 
-# Reading a CSV file from the mounted S3 bucket into a Spark DataFrame
-df = spark.read.option("header", "true").option("inferSchema", "true").csv("/mnt/mount_s4/circuits.csv")
+For more detailed explanations and additional configurations, refer to the AWS and Azure documentation respectively.
 
-# Renaming columns in the DataFrame for clarity
-df2 = df.withColumnRenamed("circuitid", "circuit_Id")\
-    .withColumnRenamed("circuitRef", "circuit_ref")
-
-# Selecting specific columns from the DataFrame
-from pyspark.sql.functions import *
-df3 = df2.select(col("circuit_Id"), col("circuit_ref"), col("name"), col('location'), col('country'))
-
-# Writing the modified DataFrame to a new Parquet file in the mounted S3 bucket
-df3.write.mode("overwrite").parquet("/mnt/mount_s4/New_circuits")
-
-# Reading the Parquet file into a Spark DataFrame
-AWS_s3 = spark.read.parquet("/mnt/mount_s4/New_circuits")
-
-# Displaying the content of the DataFrame
-AWS_s3.display()
